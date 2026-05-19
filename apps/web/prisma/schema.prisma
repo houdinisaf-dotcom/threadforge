@@ -1,0 +1,214 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users ───────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  email     String   @unique
+  name      String?
+  avatarUrl String?
+  plan      Plan     @default(FREE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  brands      Brand[]
+  mockups     Mockup[]
+  collections Collection[]
+  exports     Export[]
+  subscription Subscription?
+
+  @@map("users")
+}
+
+enum Plan {
+  FREE
+  PRO
+  STUDIO
+}
+
+// ─── Brands ──────────────────────────────────────────────────────────────────
+
+model Brand {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  slug        String
+  logoUrl     String?
+  colors      Json     @default("[]") // BrandColor[]
+  fonts       Json     @default("[]") // BrandFont[]
+  description String?
+  website     String?
+  instagram   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mockups     Mockup[]
+  collections Collection[]
+
+  @@unique([userId, slug])
+  @@map("brands")
+}
+
+// ─── Templates ───────────────────────────────────────────────────────────────
+
+model Template {
+  id          String          @id @default(cuid())
+  name        String
+  slug        String          @unique
+  category    TemplateCategory
+  subcategory String?
+  imageUrl    String          // Cloudinary URL of the blank garment
+  maskUrl     String          // Mask layer for design placement
+  thumbUrl    String
+  width       Int             @default(2000)
+  height      Int             @default(2000)
+  designArea  Json            // { x, y, width, height, rotation }
+  tags        String[]
+  isPremium   Boolean         @default(false)
+  isActive    Boolean         @default(true)
+  sortOrder   Int             @default(0)
+  createdAt   DateTime        @default(now())
+
+  mockups     Mockup[]
+
+  @@map("templates")
+}
+
+enum TemplateCategory {
+  TSHIRT
+  HOODIE
+  SWEATSHIRT
+  HAT
+  JOGGERS
+  SHORTS
+  JACKET
+  LONGSLEEVE
+  TANKTOP
+  DRESS
+  ACCESSORIES
+}
+
+// ─── Mockups ─────────────────────────────────────────────────────────────────
+
+model Mockup {
+  id          String       @id @default(cuid())
+  userId      String
+  brandId     String?
+  templateId  String
+  name        String
+  canvasJson  Json         // Fabric.js canvas serialization
+  previewUrl  String?      // Generated preview (Cloudinary)
+  status      MockupStatus @default(DRAFT)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brand       Brand?     @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  template    Template   @relation(fields: [templateId], references: [id])
+  exports     Export[]
+  collections CollectionMockup[]
+
+  @@map("mockups")
+}
+
+enum MockupStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+// ─── Collections ─────────────────────────────────────────────────────────────
+
+model Collection {
+  id          String   @id @default(cuid())
+  userId      String
+  brandId     String?
+  name        String
+  description String?
+  coverUrl    String?
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brand    Brand?             @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  mockups  CollectionMockup[]
+
+  @@map("collections")
+}
+
+model CollectionMockup {
+  collectionId String
+  mockupId     String
+  order        Int      @default(0)
+  addedAt      DateTime @default(now())
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  mockup     Mockup     @relation(fields: [mockupId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, mockupId])
+  @@map("collection_mockups")
+}
+
+// ─── Exports ─────────────────────────────────────────────────────────────────
+
+model Export {
+  id        String       @id @default(cuid())
+  userId    String
+  mockupId  String
+  format    ExportFormat
+  width     Int
+  height    Int
+  url       String
+  fileSize  Int?
+  createdAt DateTime     @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mockup Mockup @relation(fields: [mockupId], references: [id], onDelete: Cascade)
+
+  @@map("exports")
+}
+
+enum ExportFormat {
+  PNG
+  WEBP
+  PDF
+  ZIP
+}
+
+// ─── Subscriptions ───────────────────────────────────────────────────────────
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  userId             String             @unique
+  stripeCustomerId   String             @unique
+  stripeSubId        String?            @unique
+  stripePriceId      String?
+  status             SubscriptionStatus @default(INACTIVE)
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean            @default(false)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  INACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+}
