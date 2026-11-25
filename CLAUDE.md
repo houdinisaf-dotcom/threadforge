@@ -24,7 +24,7 @@ Target users: small-to-mid clothing brands, streetwear labels, print-on-demand s
 | Framework | Next.js (App Router) | 14 |
 | Language | TypeScript | 5 |
 | Styling | Tailwind CSS + shadcn/ui | 3.x |
-| Canvas editor | Fabric.js | 5 |
+| Canvas editor | Fabric.js | 6 |
 | ORM | Prisma | 5 |
 | Database | PostgreSQL | any |
 | Auth | Clerk | 5 |
@@ -51,26 +51,33 @@ threadforge/
         ├── prisma/
         │   ├── schema.prisma        ← canonical data model, edit this first
         │   └── seed.ts              ← seeds template rows (clothing garments)
+        ├── scripts/
+        │   └── generate-assets.mjs  ← writes the SVG garment + mockup artwork
         ├── public/
-        │   ├── templates/           ← placeholder slot for local garment PNGs
-        │   └── og/                  ← OpenGraph images
+        │   ├── templates/           ← blank garment SVGs (generated, committed)
+        │   └── mockups/             ← sample designed mockups (generated, committed)
         └── src/
             ├── app/
             │   ├── (auth)/          ← Clerk sign-in / sign-up pages
-            │   ├── (dashboard)/     ← authenticated app shell + all pages
+            │   ├── (dashboard)/     ← authenticated app shell
             │   │   ├── layout.tsx   ← sidebar nav, UserButton
-            │   │   ├── mockups/     ← main grid of user's mockups
-            │   │   ├── brands/      ← brand kit management
-            │   │   ├── collections/ ← lookbooks / drops
-            │   │   ├── editor/      ← Fabric.js canvas editor per mockup
-            │   │   └── settings/    ← account, billing, plan
+            │   │   └── dashboard/   ← URL segment, so pages are /dashboard/*
+            │   │       ├── mockups/     ← main grid of user's mockups
+            │   │       ├── brands/      ← brand kit management
+            │   │       ├── collections/ ← lookbooks / drops
+            │   │       ├── editor/      ← Fabric.js editor (/new and /[id])
+            │   │       └── settings/    ← account, usage, billing
             │   ├── (marketing)/     ← public landing page, pricing, about
             │   └── api/
             │       ├── mockups/     ← GET list, POST create
             │       ├── brands/      ← GET list, POST create
             │       ├── templates/   ← GET list (no auth required)
+            │       ├── collections/ ← GET list, POST create
+            │       ├── mockups/[id]/ ← GET / PATCH / DELETE
+            │       ├── export/      ← canvas snapshot → Cloudinary → Export row
             │       ├── upload/      ← POST base64 → Cloudinary
-            │       └── webhooks/stripe/ ← Stripe event handler
+            │       ├── stripe/{checkout,portal}/
+            │       └── webhooks/{stripe,clerk}/
             ├── components/
             │   ├── ui/              ← shadcn/ui primitives only (Button, Dialog, etc.)
             │   ├── editor/          ← Fabric.js canvas, toolbar, color picker, layers panel
@@ -79,12 +86,18 @@ threadforge/
             │   ├── template/        ← TemplateGallery (filterable), TemplateCard
             │   └── shared/          ← UploadZone, Navbar, Sidebar
             ├── lib/
+            │   ├── env.ts           ← demo-mode + capability flags (isDemoMode, hasStripe…)
+            │   ├── auth.ts          ← Clerk ⇄ Prisma user resolution (getCurrentUser)
+            │   ├── data.ts          ← server data access — demo store or Prisma
+            │   ├── demo-data.ts     ← in-memory sample workspace for demo mode
+            │   ├── editor.ts        ← canvas serialisation + download helpers
+            │   ├── preview.ts       ← dataURL → stored preview URL
             │   ├── db.ts            ← singleton Prisma client
             │   ├── cloudinary.ts    ← upload, delete, URL helpers
             │   ├── stripe.ts        ← Stripe client + PLANS constant
             │   ├── validations.ts   ← all Zod schemas (source of truth for shapes)
             │   └── utils.ts         ← cn(), slugify(), formatBytes(), absoluteUrl()
-            ├── hooks/               ← useEditor(), useMockup(), useBrand()
+            ├── hooks/useEditor.ts   ← Zustand editor store (name, status, dirty flags)
             └── types/
                 └── index.ts         ← re-exports Prisma types + composite types
 ```
@@ -117,22 +130,39 @@ When adding a new model or field: edit `schema.prisma` → run `npx prisma migra
 
 ---
 
+## Demo mode vs connected mode
+
+`src/lib/env.ts` exposes `isDemoMode`, which is `true` when
+`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is missing or `NEXT_PUBLIC_DEMO_MODE=1`.
+
+- **Connected mode** — Clerk auth, Prisma/Postgres, Cloudinary uploads, Stripe billing.
+- **Demo mode** — no credentials needed. `lib/demo-data.ts` holds an in-memory workspace
+  (templates, brands, collections, mockups, exports) that survives hot reloads via
+  `globalThis`; `lib/data.ts` reads from it instead of Prisma.
+
+Rules when adding a feature:
+
+1. Never import `./db` or `@clerk/nextjs/server` at module scope in shared code — import them
+   dynamically inside the connected-mode branch, otherwise demo mode (and builds without a
+   generated Prisma client) break.
+2. Pages call helpers from `lib/data.ts`; API routes call `getCurrentUser()` first.
+3. Anything that persists must handle both modes (see `/api/mockups/[id]`).
+
 ## Auth pattern
 
-All authenticated API routes and server components follow this pattern:
-
 ```ts
-import { auth } from "@clerk/nextjs/server";
+import { getCurrentUser } from "@/lib/auth";
 
-const { userId } = await auth();           // Clerk user ID (string)
-if (!userId) return redirect("/sign-in");  // or 401 in route handlers
-
-const user = await db.user.findUnique({ where: { clerkId: userId } });
+const user = await getCurrentUser();       // demo user, or Clerk → Prisma user
+if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 ```
 
-The `User.clerkId` column is the bridge between Clerk and the database. Never use Clerk's `userId` as a primary key in relations — always resolve to `User.id` (cuid) first.
+`getCurrentUser()` resolves the Clerk id, finds the `User` row, and creates it from the Clerk
+profile if the webhook has not fired yet. The `User.clerkId` column is the bridge between Clerk
+and the database — never use Clerk's `userId` as a relation key; resolve to `User.id` (cuid).
 
-Webhook to sync Clerk → DB is not yet implemented. Add it at `src/app/api/webhooks/clerk/route.ts` using Clerk's `user.created` event.
+`/api/webhooks/clerk` keeps the table in sync for `user.created`, `user.updated` and
+`user.deleted`.
 
 ---
 
@@ -150,12 +180,16 @@ Webhook to sync Clerk → DB is not yet implemented. Add it at `src/app/api/webh
 
 The mockup editor lives in `src/components/editor/` and `src/app/(dashboard)/editor/`.
 
-- **Library:** Fabric.js 5.x (not v6 — API is different)
-- **Canvas state** is serialized via `canvas.toJSON()` and stored in `Mockup.canvasJson`
-- **Restore** via `canvas.loadFromJSON(mockup.canvasJson)`
-- The garment base image is always the bottom-most object (`sendObjectToBack`)
-- Design placement is constrained by `Template.designArea` — clip or snap to those bounds
-- Export: `canvas.toDataURL({ format: 'png', multiplier: exportScale })` → POST to `/api/upload`
+- **Library:** Fabric.js 6 — `FabricImage`, `FabricText`, promise-based `loadFromJSON` and
+  `FabricImage.fromURL(url, { crossOrigin })`
+- **Canvas state** is serialised with `serializeCanvas()` (`src/lib/editor.ts`) into
+  `Mockup.canvasJson`. It deliberately drops the garment image and the print-area guide so
+  restoring never duplicates them.
+- **Restore** via `canvas.loadFromJSON(json)` before the garment image is added
+- The garment image is always bottom-most (`sendObjectToBack`); the dashed guide sits above it
+- `Template.designArea` drives the guide and where new text/images are centred
+- Export: `canvas.toDataURL({ format, multiplier: 2.5 })` → POST `/api/export`
+  (Cloudinary upload + `Export` row in connected mode; direct download in demo mode)
 
 When adding editor features, keep side effects (upload, DB save) outside the canvas components — pass callbacks down from the page.
 
@@ -267,16 +301,24 @@ Variables prefixed `NEXT_PUBLIC_` are exposed to the browser. Never put secrets 
 ```bash
 cd apps/web
 npm install
-npx prisma migrate dev       # applies migrations, generates client
-npx prisma db seed           # seeds template rows
-npm run dev                  # http://localhost:3000
+npm run dev                  # demo mode, no credentials needed
+```
+
+With credentials in `apps/web/.env.local`:
+
+```bash
+npx prisma generate          # downloads engines — needs network access
+npx prisma migrate dev       # applies migrations against DATABASE_URL
+npm run db:seed              # seeds template rows
+npm run dev
 ```
 
 Other useful commands:
 
 ```bash
 npm run typecheck            # tsc --noEmit (run before committing)
-npm run lint                 # eslint
+npm run lint                 # next lint
+npm run assets               # regenerate the SVG garment artwork
 npx prisma studio            # GUI database browser at localhost:5555
 npx prisma migrate reset     # wipe + re-apply all migrations (dev only)
 ```
@@ -285,18 +327,19 @@ npx prisma migrate reset     # wipe + re-apply all migrations (dev only)
 
 ## What is NOT built yet (next priorities)
 
-These are known gaps — if asked to implement them, check this list first:
+The core app is wired end to end. Remaining gaps:
 
-1. **Clerk webhook** (`/api/webhooks/clerk`) — syncs new Clerk users to the `User` table on `user.created` event. Without this, users who sign up won't have a DB row yet.
-2. **Editor page** (`/dashboard/editor/[id]`) — the actual page wrapping `MockupCanvas` + `EditorToolbar`. The components exist but the page route doesn't.
-3. **Brands page** (`/dashboard/brands`) — list + create brand form. Schema and API route exist.
-4. **Collections page** (`/dashboard/collections`) — list + create. Schema exists.
-5. **Settings / billing page** — upgrade flow using Stripe Checkout.
-6. **ThemeProvider** — dark mode toggle.
-7. **`/api/mockups/[id]`** — PATCH (save canvas), DELETE, GET single.
-8. **`/api/templates`** — GET public list for the template gallery.
-9. **Zustand editor store** — `src/hooks/useEditor.ts` is a stub.
-10. **Export pipeline** — canvas → dataURL → Cloudinary → `Export` row.
+1. **Dark mode** — `tailwind.config.ts` is class-based and `.dark` tokens exist in
+   `globals.css`, but there is no ThemeProvider or toggle.
+2. **PDF / ZIP export** — the enum supports it; only PNG and WebP are rendered client-side.
+3. **Plan enforcement** — `PLANS` limits are shown as usage meters but not enforced in the
+   API (no guard rejecting over-limit creates).
+4. **Transactional email** — `resend` is a dependency but nothing sends mail yet.
+5. **Public collection pages** — `Collection.isPublic` exists; no share route renders it.
+6. **Delete / rename for brands and collections** — create + list work; no PATCH/DELETE routes.
+7. **Tests** — no unit or e2e suite; CI runs lint, typecheck and build only.
+8. **Prisma migrations** — the schema exists but `prisma/migrations` is empty, so deploys need
+   `prisma db push` until the first `migrate dev` is committed.
 
 ---
 

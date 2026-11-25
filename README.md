@@ -43,25 +43,34 @@ ThreadForge is a **full-stack SaaS boilerplate** for building clothing brand moc
 
 ---
 
-## Demo
+## Demo mode (zero config)
 
-> Screenshots and live demo coming soon. Star the repo to get notified.
+ThreadForge boots into a **demo workspace** when no credentials are present — no database,
+no Clerk account, no Cloudinary and no Stripe keys required:
 
-<!-- Add screenshots here once the UI is built out:
-![ThreadForge mockup editor](docs/editor-screenshot.png)
-![ThreadForge brand kit](docs/brand-kit-screenshot.png)
-![ThreadForge template gallery](docs/template-gallery-screenshot.png)
--->
+```bash
+cd apps/web
+npm install
+npm run dev          # http://localhost:3000
+```
+
+That gives you the marketing site, the mockup editor (Fabric.js on locally generated garment
+artwork), brand kits, collections, exports and the billing screen, all backed by an in-memory
+sample workspace. Edits persist until the dev server restarts.
+
+Demo mode turns on automatically when `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is missing, or
+explicitly with `NEXT_PUBLIC_DEMO_MODE=1`. Add real credentials (see below) and the exact same
+code paths read from Postgres, Clerk, Cloudinary and Stripe instead.
 
 ---
 
 ## Features
 
 ### Mockup Editor
-- Drag-and-drop design placement on 100+ garment templates (t-shirts, hoodies, hats, joggers, jackets, and more)
-- Fabric.js canvas with text, image, layer, and transform controls
-- Real-time preview with photorealistic clothing templates
-- Canvas state saved as JSON — restore and re-edit anytime
+- Fabric.js canvas with text, image, layer and transform controls
+- Garment templates with a mapped printable area (and a dashed on-canvas guide)
+- Switch garments without losing your artwork; artwork is serialised as JSON and re-editable
+- Single-keyboard-friendly toolbar: text size, bold/italic, layer order, delete
 
 ### Brand Kit Management
 - Create unlimited brands under one account (Pro/Studio plans)
@@ -74,14 +83,14 @@ ThreadForge is a **full-stack SaaS boilerplate** for building clothing brand moc
 - Custom cover image per collection
 
 ### Export & Asset Delivery
-- Export PNG, WebP, or PDF at any resolution (up to 6000px)
-- Export history tracked per mockup
-- Optimized URLs via Cloudinary CDN
+- PNG and WebP export at 2.5× resolution (2000 px) straight from the canvas
+- Every export is recorded in the `Export` table with format, size and URL
+- Optimised, durable export URLs via Cloudinary CDN
 
-### Subscriptions & Gating
-- Free / Pro / Studio tiers via Stripe Checkout
-- Per-plan limits on mockups, brands, and exports
-- Stripe webhook handler for real-time subscription sync
+### Subscriptions & Billing
+- Free / Pro / Studio tiers via Stripe Checkout + Billing Portal
+- Usage meters against each plan's limits
+- Stripe webhook handler keeps `Subscription` rows and `User.plan` in sync
 
 ---
 
@@ -91,8 +100,8 @@ ThreadForge is a **full-stack SaaS boilerplate** for building clothing brand moc
 |---|---|---|
 | Framework | **Next.js 14** (App Router) | Server components, streaming, file-based routing |
 | Language | **TypeScript 5** | End-to-end type safety |
-| Styling | **Tailwind CSS + shadcn/ui** | Utility-first + accessible headless components |
-| Canvas | **Fabric.js 5** | Mature, flexible HTML5 canvas for mockup editing |
+| Styling | **Tailwind CSS + shadcn-style UI** | Utility-first + accessible Radix primitives |
+| Canvas | **Fabric.js 6** | Modern promise-based API, tree-shakeable build |
 | ORM | **Prisma 5** | Type-safe PostgreSQL queries + migrations |
 | Database | **PostgreSQL** | Relational, works with Neon / Supabase / Railway |
 | Auth | **Clerk** | Drop-in auth with social login, orgs, webhooks |
@@ -119,30 +128,44 @@ threadforge/
         ├── prisma/
         │   ├── schema.prisma    # Full data model
         │   └── seed.ts          # Garment template rows
+        ├── scripts/
+        │   └── generate-assets.mjs  # builds public/templates + public/mockups SVGs
+        ├── public/
+        │   ├── templates/           # blank garment artwork (generated)
+        │   └── mockups/             # sample designed mockups (generated)
         └── src/
             ├── app/
-            │   ├── (auth)/          # Clerk sign-in / sign-up
-            │   ├── (dashboard)/     # Authenticated app
-            │   │   ├── mockups/     # Mockup grid
-            │   │   ├── brands/      # Brand kit management
-            │   │   ├── collections/ # Lookbooks
-            │   │   ├── editor/      # Canvas editor
-            │   │   └── settings/    # Account + billing
-            │   ├── (marketing)/     # Landing page, pricing
-            │   └── api/             # REST endpoints + Stripe webhooks
+            │   ├── (auth)/              # Clerk sign-in / sign-up
+            │   ├── (dashboard)/         # Authenticated app shell
+            │   │   └── dashboard/       # → /dashboard/*
+            │   │       ├── mockups/     # Mockup grid
+            │   │       ├── brands/      # Brand kit management
+            │   │       ├── collections/ # Lookbooks
+            │   │       ├── editor/      # Canvas editor (new + [id])
+            │   │       └── settings/    # Account, usage + billing
+            │   ├── (marketing)/         # Landing page, pricing
+            │   └── api/                 # REST endpoints + webhooks
             ├── components/
-            │   ├── ui/              # shadcn/ui primitives
-            │   ├── editor/          # Fabric.js canvas + toolbar
-            │   ├── mockup/          # MockupCard, MockupGrid
-            │   ├── brand/           # BrandKit, ColorPalette
-            │   ├── template/        # TemplateGallery (filterable by category)
-            │   └── shared/          # UploadZone, Sidebar, Navbar
+            │   ├── ui/                  # Button, Dialog, Dropdown, Card, Input…
+            │   ├── editor/              # canvas, toolbar, editor shell
+            │   ├── mockup/              # MockupCard
+            │   ├── brand/               # CreateBrand dialog
+            │   ├── collection/          # CreateCollection dialog
+            │   ├── template/            # TemplateGallery (filterable)
+            │   └── shared/              # UploadZone
+            ├── hooks/useEditor.ts       # Zustand editor store
             └── lib/
-                ├── db.ts            # Prisma singleton
-                ├── cloudinary.ts    # Upload + URL helpers
-                ├── stripe.ts        # Stripe client + plan definitions
-                ├── validations.ts   # Zod schemas for all inputs
-                └── utils.ts         # cn(), slugify(), formatBytes()
+                ├── env.ts               # demo-mode + capability flags
+                ├── auth.ts              # Clerk ⇄ Prisma user resolution
+                ├── data.ts              # server data access (demo | Prisma)
+                ├── demo-data.ts         # in-memory sample workspace
+                ├── db.ts                # Prisma singleton
+                ├── editor.ts            # canvas serialisation helpers
+                ├── preview.ts           # dataURL → stored preview
+                ├── cloudinary.ts        # upload + URL helpers
+                ├── stripe.ts            # lazy Stripe client + plan definitions
+                ├── validations.ts       # Zod schemas for all inputs
+                └── utils.ts             # cn(), slugify(), formatBytes()
 ```
 
 ---
@@ -166,6 +189,9 @@ Template              → seeded garment library (tees, hoodies, hats …)
 ---
 
 ## Getting Started
+
+> **Just want to click around?** Skip to the [demo mode](#demo-mode-zero-config) instructions —
+> `npm install && npm run dev` is enough.
 
 ### Prerequisites
 
@@ -193,8 +219,9 @@ Open `apps/web/.env.local` and fill in all values. Every variable is documented 
 ```bash
 cd apps/web
 npm install
-npx prisma migrate dev    # applies migrations + generates Prisma client
-npx prisma db seed        # seeds the garment template library
+npx prisma generate       # downloads the query engine and generates the client
+npx prisma migrate dev    # applies migrations against DATABASE_URL
+npm run db:seed           # seeds the garment template library
 npm run dev               # http://localhost:3000
 ```
 
@@ -202,7 +229,8 @@ npm run dev               # http://localhost:3000
 
 ```bash
 npm run typecheck         # tsc --noEmit — run before every commit
-npm run lint              # ESLint
+npm run lint              # ESLint (next lint)
+npm run assets            # regenerate public/templates + public/mockups SVGs
 npx prisma studio         # GUI database browser at localhost:5555
 npx prisma migrate reset  # wipe + re-migrate (dev only)
 ```
@@ -213,14 +241,15 @@ npx prisma migrate reset  # wipe + re-migrate (dev only)
 
 - [x] Prisma schema — User, Brand, Template, Mockup, Collection, Export, Subscription
 - [x] Fabric.js canvas editor components
-- [x] API routes — mockups, brands, upload, Stripe webhooks
+- [x] API routes — mockups (+ `[id]`), brands, collections, templates, export, upload
 - [x] Cloudinary + Stripe + Clerk wiring
-- [x] Landing page + dashboard shell + CI pipeline
-- [ ] Clerk webhook → sync new sign-ups to DB
-- [ ] Editor page (`/dashboard/editor/[id]`) — page wrapping the canvas components
-- [ ] Brands & Collections dashboard pages
-- [ ] Stripe Checkout upgrade flow + billing settings
-- [ ] Dark mode toggle
+- [x] Landing page + pricing + dashboard shell + CI pipeline
+- [x] Clerk webhook → sync sign-ups to the `User` table
+- [x] Editor page (`/dashboard/editor/[id]` + `/new`) wiring canvas, toolbar and store
+- [x] Brands & Collections dashboard pages
+- [x] Stripe Checkout upgrade flow + billing settings
+- [x] Zero-config demo mode with generated garment artwork
+- [ ] Dark mode toggle (ThemeProvider)
 - [ ] AI-powered design placement suggestions
 - [ ] Bulk mockup generation (one design × multiple colorways)
 - [ ] Shopify integration — push mockups directly to product listings
