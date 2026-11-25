@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800"
+    width="800" height="800" role="img">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="78%">
+      <stop offset="0%" stop-color="#f1efea"/>
+      <stop offset="100%" stop-color="#e5e2db"/>
+    </radialGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.26"/>
+      <stop offset="45%" stop-color="#ffffff" stop-opacity="0.02"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.12"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="800" fill="url(#bg)"/>
+    undefined
+    <clipPath id="joggers-grey-clip"><path d="M294 206 L506 206 L522 330 L512 690 L424 690 L412 430
+                      Q400 414 388 430 L376 690 L288 690 L278 330 Z"/></clipPath>
+    <defs>
+      <linearGradient id="joggers-grey-fabric" x1="0.15" y1="0" x2="0.85" y2="1">
+        <stop offset="0%" stop-color="#dedcd8"/>
+        <stop offset="52%" stop-color="#c8c7c2"/>
+        <stop offset="100%" stop-color="#ada9a2"/>
+      </linearGradient>
+    </defs>
+    <path d="M294 206 L506 206 L522 330 L512 690 L424 690 L412 430
+                      Q400 414 388 430 L376 690 L288 690 L278 330 Z" fill="url(#joggers-grey-fabric)" stroke="#9d9a94" stroke-width="2.5"
+          stroke-linejoin="round"/>
+    <g clip-path="url(#joggers-grey-clip)">
+      <rect x="0" y="0" width="800" height="800" fill="url(#sheen)"/>
+      <path d="M278 330 L288 690" stroke="#9d9a94" stroke-width="1.3" opacity="0.4"/>
+           <path d="M522 330 L512 690" stroke="#9d9a94" stroke-width="1.3" opacity="0.4"/>
+           <ellipse cx="360" cy="360" rx="90" ry="150" fill="#ffffff" opacity="0.08"/>
+    </g>
+    
+      <path d="M292 164 L508 164 L510 208 L290 208 Z" fill="#b6b3ad" opacity="0.75"
+            stroke="#9d9a94" stroke-width="2"/>
+      <path d="M290 208 L510 208" stroke="#9d9a94" stroke-width="2"/>
+      <path d="M356 208 Q400 252 444 208" fill="none" stroke="#9d9a94" stroke-width="1.8" opacity="0.6"/>
+      <path d="M388 430 Q400 414 412 430" fill="none" stroke="#9d9a94" stroke-width="3"/>
+      <path d="M300 236 L316 372" fill="none" stroke="#9d9a94" stroke-width="1.5" opacity="0.45"/>
+      <path d="M500 236 L484 372" fill="none" stroke="#9d9a94" stroke-width="1.5" opacity="0.45"/>
+      <path d="M288 672 L366 672 L366 690 L288 690 Z" fill="#b6b3ad" opacity="0.8"/>
+      <path d="M434 672 L512 672 L512 690 L434 690 Z" fill="#b6b3ad" opacity="0.8"/>
+      <path d="M288 672 L366 672 M434 672 L512 672" stroke="#9d9a94" stroke-width="2"/><g transform="translate(349.8 265.8)
+      scale(0.924)">
+    <g>
+      <path d="M28 52 L41 30 L51 45 L61 26 L72 52" fill="none" stroke="#2f4858"
+            stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+      <text x="50" y="74" text-anchor="middle" font-family="Helvetica, Arial, sans-serif"
+            font-size="8" letter-spacing="2.2" fill="#2f4858">TRAIL</text>
+    </g></g></svg>

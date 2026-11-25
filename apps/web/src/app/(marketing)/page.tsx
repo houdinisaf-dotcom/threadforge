@@ -1,84 +1,106 @@
 import Link from "next/link";
-import { ArrowRight, Layers, Palette, Package, Download } from "lucide-react";
+import { ArrowRight, Download, Layers, Package, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getTemplates } from "@/lib/data";
+import { isDemoMode } from "@/lib/env";
 
-export default function LandingPage() {
+const features = [
+  {
+    icon: Layers,
+    title: "Ready-made templates",
+    desc: "Tees, hoodies, caps and joggers — flat-lay garments with print areas already mapped.",
+  },
+  {
+    icon: Palette,
+    title: "Brand kits",
+    desc: "Store palettes, fonts and links per brand so every mockup stays on-brand.",
+  },
+  {
+    icon: Package,
+    title: "Collections",
+    desc: "Group mockups into drops or lookbooks and share them with buyers.",
+  },
+  {
+    icon: Download,
+    title: "Print-ready exports",
+    desc: "Export PNG or WebP at 2.5× resolution straight from the editor.",
+  },
+];
+
+export default async function LandingPage() {
+  const templates = await getTemplates();
+  const primaryHref = isDemoMode ? "/dashboard/mockups" : "/sign-up";
+
   return (
-    <div className="flex min-h-screen flex-col">
-      {/* Nav */}
-      <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-          <div className="flex items-center gap-2 font-semibold">
-            <Layers className="h-5 w-5" />
-            ThreadForge
-          </div>
-          <nav className="hidden gap-6 text-sm text-muted-foreground sm:flex">
-            <Link href="/pricing" className="hover:text-foreground">Pricing</Link>
-            <Link href="/about" className="hover:text-foreground">About</Link>
-          </nav>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/sign-in">Sign in</Link>
-            </Button>
-            <Button size="sm" asChild>
-              <Link href="/sign-up">Get started free</Link>
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      {/* Hero */}
-      <section className="flex flex-1 flex-col items-center justify-center gap-6 px-4 py-24 text-center">
+    <div>
+      <section className="mx-auto flex max-w-4xl flex-col items-center gap-6 px-4 py-20 text-center sm:py-28">
         <p className="rounded-full border bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
           Built for clothing brands
         </p>
-        <h1 className="max-w-3xl text-5xl font-bold tracking-tight">
-          Mockups that make your brand look{" "}
-          <span className="text-primary">incredible</span>
+        <h1 className="max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
+          Mockups that make your brand look <span className="text-primary">incredible</span>
         </h1>
         <p className="max-w-xl text-lg text-muted-foreground">
-          Place your designs on photorealistic garment templates, manage your brand kit, organize
-          collections, and export in seconds — no Photoshop needed.
+          Place your designs on garment templates, keep your brand kit in one place, organise
+          collections and export in seconds — no Photoshop needed.
         </p>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap justify-center gap-3">
           <Button size="lg" asChild>
-            <Link href="/sign-up">
-              Start for free <ArrowRight className="ml-2 h-4 w-4" />
+            <Link href={primaryHref}>
+              {isDemoMode ? "Explore the demo" : "Start for free"}
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
           <Button size="lg" variant="outline" asChild>
             <Link href="/pricing">See pricing</Link>
           </Button>
         </div>
+        {isDemoMode && (
+          <p className="text-xs text-muted-foreground">
+            Running in demo mode — no account or database required.
+          </p>
+        )}
       </section>
 
-      {/* Features */}
-      <section className="border-t bg-muted/30 py-20">
+      <section id="templates" className="border-y bg-muted/30 py-16">
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight">The template library</h2>
+              <p className="text-sm text-muted-foreground">
+                {templates.length} garments ready to design on.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/dashboard/editor/new">Open the editor</Link>
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            {templates.map((template) => (
+              <div
+                key={template.id}
+                className="overflow-hidden rounded-xl border bg-card shadow-sm"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={template.thumbUrl}
+                  alt={template.name}
+                  className="aspect-square w-full object-cover"
+                  loading="lazy"
+                />
+                <p className="truncate px-2 py-2 text-center text-xs">{template.name}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="features" className="py-20">
         <div className="mx-auto max-w-6xl px-4">
           <h2 className="mb-12 text-center text-3xl font-bold">Everything your brand needs</h2>
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                icon: Layers,
-                title: "100+ Templates",
-                desc: "Tees, hoodies, hats, joggers, and more — new templates added weekly.",
-              },
-              {
-                icon: Palette,
-                title: "Brand Kit",
-                desc: "Store logos, colors, and fonts per brand. Switch in one click.",
-              },
-              {
-                icon: Package,
-                title: "Collections",
-                desc: "Group mockups into seasonal drops or lookbooks to share with buyers.",
-              },
-              {
-                icon: Download,
-                title: "Pro Exports",
-                desc: "Export PNG, WebP, or PDF at any resolution — print or digital ready.",
-              },
-            ].map(({ icon: Icon, title, desc }) => (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {features.map(({ icon: Icon, title, desc }) => (
               <div key={title} className="rounded-xl border bg-card p-6 shadow-sm">
                 <Icon className="mb-3 h-8 w-8 text-primary" />
                 <h3 className="mb-1 font-semibold">{title}</h3>
@@ -89,9 +111,17 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer className="border-t py-8 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} ThreadForge. All rights reserved.
-      </footer>
+      <section className="border-t bg-primary py-16 text-primary-foreground">
+        <div className="mx-auto flex max-w-3xl flex-col items-center gap-4 px-4 text-center">
+          <h2 className="text-3xl font-bold">Your next drop starts here</h2>
+          <p className="text-primary-foreground/80">
+            Design, organise and export your whole lookbook in an afternoon.
+          </p>
+          <Button size="lg" variant="secondary" asChild>
+            <Link href={primaryHref}>Get started free</Link>
+          </Button>
+        </div>
+      </section>
     </div>
   );
 }
